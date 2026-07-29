@@ -279,6 +279,34 @@
     .stamp{transform:none;}
   }
 </style>
+<style>
+  /* tambahan untuk versi tersambung spreadsheet */
+  .kabar{
+    display:flex;gap:11px;align-items:flex-start;margin:18px 0 0;padding:13px 15px;
+    border:1px solid var(--carbon-pink-edge);border-left:3px solid var(--stamp-red);
+    border-radius:var(--radius);background:var(--carbon-pink);font-size:13.5px;line-height:1.55;
+  }
+  .kabar b{display:block;margin-bottom:2px;}
+  .kabar code{
+    font-family:"IBM Plex Mono",monospace;font-size:12px;background:rgba(255,255,255,.7);
+    padding:1px 4px;border-radius:2px;
+  }
+  .sinkron{display:inline-flex;align-items:center;gap:6px;}
+  .titik{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);flex:0 0 auto;}
+  .titik--ok{background:var(--stamp-green);}
+  .titik--sibuk{background:#C98A16;animation:kedip 1s ease-in-out infinite;}
+  .titik--gagal{background:var(--stamp-red);}
+  @keyframes kedip{0%,100%{opacity:1}50%{opacity:.25}}
+  .memuat{padding:48px 24px;text-align:center;color:var(--ink-soft);font-size:14px;}
+  .putar{
+    display:inline-block;width:15px;height:15px;margin-right:8px;vertical-align:-3px;
+    border:2px solid var(--rule-strong);border-top-color:var(--blue);border-radius:50%;
+    animation:putar .7s linear infinite;
+  }
+  @keyframes putar{to{transform:rotate(360deg)}}
+  button[disabled]{opacity:.5;cursor:not-allowed;}
+  .modal__foot .tunggu{margin-right:auto;font-size:12.5px;color:var(--ink-soft);align-self:center;}
+</style>
 </head>
 <body>
 <div class="wrap">
@@ -291,7 +319,7 @@
       </div>
       <div class="kop__org">
         <b>PT Nad Inti Distribusi</b>
-        Dokumen internal &middot; Toko &rarr; Gudang
+        Data bersama &middot; Google Spreadsheet
       </div>
     </div>
     <div class="kop__fields">
@@ -314,6 +342,11 @@
     </div>
   </header>
 
+  <div class="kabar" id="kabar" hidden>
+    <span aria-hidden="true">!</span>
+    <div id="kabar-teks"></div>
+  </div>
+
   <div class="bar">
     <div class="bar__search">
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -329,6 +362,12 @@
       <option value="belum">Belum ada berkas</option>
     </select>
     <button class="btn-ghost" id="btn-reset" type="button">Atur ulang</button>
+    <button id="btn-muat" type="button">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M13.5 8a5.5 5.5 0 11-1.9-4.2M13.5 2v2.5H11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Muat ulang
+    </button>
     <button id="btn-csv" type="button">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <path d="M8 2v8m0 0L5 7m3 3l3-3M2.5 12.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
@@ -360,6 +399,7 @@
         <tbody id="tbody"></tbody>
       </table>
     </div>
+    <div id="memuat" class="memuat"><span class="putar"></span>Mengambil data dari spreadsheet…</div>
     <div id="kosong" class="kosong-state" hidden>
       <h3>Belum ada baris yang cocok</h3>
       <p>Ubah kata kunci pencarian, atau catat GR retur baru untuk mulai memantau.</p>
@@ -367,7 +407,7 @@
     </div>
     <div class="kaki">
       <span id="kaki-info">0 baris</span>
-      <span id="kaki-simpan">Menyiapkan penyimpanan…</span>
+      <span class="sinkron"><span class="titik" id="titik"></span><span id="kaki-simpan">Menghubungkan…</span></span>
     </div>
   </section>
 </div>
@@ -420,7 +460,7 @@
             </svg>
           </div>
           <b>Tarik berkas ke sini, atau klik untuk pilih</b>
-          <span>PDF, JPG, PNG &middot; maks 10 MB</span>
+          <span>PDF, JPG, PNG &middot; maks 8 MB</span>
         </div>
         <div class="lampiran" id="lampiran" hidden>
           <div class="lampiran__pratinjau" id="lampiran-pratinjau"></div>
@@ -439,6 +479,7 @@
       </div>
     </div>
     <div class="modal__foot">
+      <span class="tunggu" id="tunggu" hidden><span class="putar"></span>Mengunggah ke Drive…</span>
       <button id="btn-batal" type="button">Batal</button>
       <button class="btn-primary" id="btn-simpan" type="button">Simpan</button>
     </div>
@@ -464,7 +505,7 @@
       <div class="lihat" id="lihat-isi"></div>
     </div>
     <div class="modal__foot">
-      <button id="btn-tab" type="button">Buka di tab baru</button>
+      <button id="btn-tab" type="button">Buka di Drive</button>
       <button class="btn-primary" id="btn-unduh" type="button">Unduh berkas</button>
     </div>
   </div>
@@ -476,135 +517,108 @@
 (function(){
   "use strict";
 
-  var KEY = "monitoring-retur:baris";
-  var KEY_FILE = "monitoring-retur:berkas:";
-  var BATAS = 10 * 1024 * 1024;
-  var KATEGORI = "Retur";
+  /* ============================================================
+     TEMPEL ALAMAT WEB APP APPS SCRIPT DI SINI
+     Bentuknya: https://script.google.com/macros/s/AKfy..../exec
+     ============================================================ */
+  var API = "https://script.google.com/macros/s/AKfycbz8gyTbKtw9QexegGse6tWrsCOfHn9tFK7eZ2cBIa04doctiv0m4sBqTpcCFfKfuGTr/exec";
 
-  var contoh = [
-    {id:"a1", brand:"HEYMALE",      kategori:KATEGORI, trfo:"GR-2607-0018", sj:null},
-    {id:"a2", brand:"HEYLOCAL",     kategori:KATEGORI, trfo:"GR-2607-0021", sj:null},
-    {id:"a3", brand:"ZOMA BASIC",   kategori:KATEGORI, trfo:"GR-2607-0024", sj:null},
-    {id:"a4", brand:"SHUWA MODEST", kategori:KATEGORI, trfo:"GR-2607-0026", sj:null},
-    {id:"a5", brand:"BOONABOO",     kategori:KATEGORI, trfo:"GR-2607-0029", sj:null},
-    {id:"a6", brand:"NOSTALGY",     kategori:KATEGORI, trfo:"GR-2607-0030", sj:null}
-  ];
+  var BATAS = 8 * 1024 * 1024;
+  var KATEGORI = "Retur";
+  var JEDA_SEGAR = 45000;
 
   var baris = [];
-  var cache = {};          // id -> data URL berkas
   var urut = {key:"trfo", arah:1};
   var sedangEdit = null;
-  var berkasBaru = null;   // {nama,tipe,ukuran,data} saat form terbuka
+  var berkasBaru = null;
   var berkasDilepas = false;
   var lihatKini = null;
+  var sibuk = false;
+  var pertamaKali = true;
 
   var el = function(id){ return document.getElementById(id); };
   var tbody = el("tbody");
 
-  /* ---------- penyimpanan ---------- */
-  // indeks baris: localStorage. berkas surat jalan: IndexedDB (kuota jauh lebih besar).
-  var GUDANG = (function(){
-    if(typeof window !== "undefined" && window.storage && typeof window.storage.set === "function"){
-      return {
-        nama:"claude",
-        get:function(k){ return window.storage.get(k).then(function(h){ return h && h.value ? h.value : null; }); },
-        set:function(k,v){ return window.storage.set(k,v); },
-        del:function(k){ return window.storage.delete(k); }
-      };
-    }
+  /* ---------- status sinkron ---------- */
+  function tandai(keadaan, teks){
+    var t = el("titik");
+    t.className = "titik" + (keadaan ? " titik--" + keadaan : "");
+    el("kaki-simpan").textContent = teks;
+  }
+  function jamSekarang(){
+    var d = new Date();
+    return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+  }
+  function kabar(html){
+    el("kabar-teks").innerHTML = html;
+    el("kabar").hidden = false;
+  }
+  function tutupKabar(){ el("kabar").hidden = true; }
+
+  /* ---------- panggil API ---------- */
+  function belumDiatur(){
+    return !API || API.indexOf("script.google.com") < 0;
+  }
+
+  async function panggil(muatan){
+    if(belumDiatur()) throw new Error("Alamat web app belum diisi di berkas index.html.");
+    var opsi = muatan
+      ? {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(muatan)}
+      : {method:"GET"};
+    var resp = await fetch(API, opsi);
+    var teks = await resp.text();
+    var hasil;
     try{
-      window.localStorage.setItem("__uji__","1");
-      window.localStorage.removeItem("__uji__");
-      return {
-        nama:"lokal",
-        get:function(k){ return Promise.resolve(window.localStorage.getItem(k)); },
-        set:function(k,v){ window.localStorage.setItem(k,v); return Promise.resolve(); },
-        del:function(k){ window.localStorage.removeItem(k); return Promise.resolve(); }
-      };
-    }catch(e){}
-    var memori = {};
+      hasil = JSON.parse(teks);
+    }catch(e){
+      throw new Error("Balasan bukan JSON. Biasanya berarti web app belum dibuka untuk \"Anyone\" saat deploy.");
+    }
+    if(!hasil.ok) throw new Error(hasil.pesan || "Permintaan ditolak server.");
+    return hasil.data;
+  }
+
+  function keBaris(r){
     return {
-      nama:"memori",
-      get:function(k){ return Promise.resolve(k in memori ? memori[k] : null); },
-      set:function(k,v){ memori[k] = v; return Promise.resolve(); },
-      del:function(k){ delete memori[k]; return Promise.resolve(); }
+      id: r.id,
+      brand: r.brand,
+      kategori: KATEGORI,
+      trfo: r.gr,
+      sj: r.berkasId ? {
+        nama: r.berkasNama || "surat-jalan",
+        tipe: r.berkasTipe || "application/pdf",
+        ukuran: r.berkasUkuran || 0,
+        link: r.berkasLink || ("https://drive.google.com/file/d/" + r.berkasId + "/view"),
+        fileId: r.berkasId,
+        tanggal: r.berkasTanggal || ""
+      } : null
     };
-  })();
+  }
 
-  var DB = (function(){
-    var siap = null;
-    function buka(){
-      if(siap) return siap;
-      siap = new Promise(function(res, rej){
-        if(!window.indexedDB) return rej(new Error("tanpa indexedDB"));
-        var r = window.indexedDB.open("monitoring-retur", 1);
-        r.onupgradeneeded = function(){
-          if(!r.result.objectStoreNames.contains("berkas")) r.result.createObjectStore("berkas");
-        };
-        r.onsuccess = function(){ res(r.result); };
-        r.onerror = function(){ rej(r.error || new Error("gagal buka basis data")); };
-      });
-      return siap;
+  async function segarkan(diamDiam){
+    if(belumDiatur()){
+      el("memuat").hidden = true;
+      tandai("gagal", "Belum tersambung");
+      kabar('<b>Halaman belum tersambung ke spreadsheet.</b>' +
+            'Buka <code>index.html</code>, cari baris <code>var API = "";</code> di bagian bawah, ' +
+            'lalu tempel alamat web app Apps Script di antara tanda kutip. Panduannya ada di berkas PANDUAN.md.');
+      gambar();
+      return;
     }
-    function tx(mode, fn){
-      return buka().then(function(d){
-        return new Promise(function(res, rej){
-          var t = d.transaction("berkas", mode);
-          var minta = fn(t.objectStore("berkas"));
-          t.oncomplete = function(){ res(minta ? minta.result : null); };
-          t.onerror = function(){ rej(t.error); };
-          t.onabort = function(){ rej(t.error); };
-        });
-      });
+    if(!diamDiam) tandai("sibuk", "Mengambil data…");
+    try{
+      var data = await panggil(null);
+      baris = data.map(keBaris);
+      tutupKabar();
+      tandai("ok", "Tersinkron " + jamSekarang());
+      pertamaKali = false;
+    }catch(e){
+      tandai("gagal", "Gagal ambil data");
+      if(!diamDiam || pertamaKali){
+        kabar('<b>Data gagal diambil.</b>' + lolos(e.message));
+      }
     }
-    return {
-      simpan:function(id, blob){ return tx("readwrite", function(s){ return s.put(blob, id); }); },
-      ambil: function(id){ return tx("readonly",  function(s){ return s.get(id); }); },
-      hapus: function(id){ return tx("readwrite", function(s){ return s.delete(id); }); }
-    };
-  })();
-
-  function labelGudang(){
-    if(GUDANG.nama === "memori") return "Sesi ini saja — unduh CSV untuk arsip";
-    return "Tersimpan di browser ini";
-  }
-
-  async function muat(){
-    try{
-      var v = await GUDANG.get(KEY);
-      baris = v ? JSON.parse(v) : contoh.slice();
-      if(!Array.isArray(baris)) baris = contoh.slice();
-    }catch(e){ baris = contoh.slice(); }
-    baris.forEach(function(b){ b.kategori = KATEGORI; });
-  }
-  async function simpanIndeks(){
-    try{
-      await GUDANG.set(KEY, JSON.stringify(baris));
-      el("kaki-simpan").textContent = labelGudang();
-    }catch(e){ el("kaki-simpan").textContent = "Gagal menyimpan — unduh CSV untuk arsip"; }
-  }
-  async function simpanBerkas(id, blob){
-    cache[id] = blob;
-    try{ await DB.simpan(id, blob); return; }catch(e){}
-    try{ await GUDANG.set(KEY_FILE + id, await bacaDataURL(blob)); }
-    catch(e){ pesan("Berkas hanya tersimpan untuk sesi ini — ruang browser penuh"); }
-  }
-  async function ambilBerkas(id){
-    if(cache[id]) return cache[id];
-    try{
-      var b = await DB.ambil(id);
-      if(b){ cache[id] = b; return b; }
-    }catch(e){}
-    try{
-      var v = await GUDANG.get(KEY_FILE + id);
-      if(v){ cache[id] = keBlob(v); return cache[id]; }
-    }catch(e){}
-    return null;
-  }
-  async function hapusBerkas(id){
-    delete cache[id];
-    try{ await DB.hapus(id); }catch(e){}
-    try{ await GUDANG.del(KEY_FILE + id); }catch(e){}
+    el("memuat").hidden = true;
+    gambar();
   }
 
   /* ---------- bantu ---------- */
@@ -612,9 +626,8 @@
   function lolos(t){ return String(t == null ? "" : t).replace(/[&<>"']/g, function(c){
     return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
   });}
-  function idBaru(){ return "r" + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
   function ukuran(b){
-    if(b == null) return "—";
+    if(!b) return "—";
     if(b < 1024) return b + " B";
     if(b < 1024*1024) return (b/1024).toFixed(0) + " KB";
     return (b/1024/1024).toFixed(1) + " MB";
@@ -632,24 +645,16 @@
     t.textContent = teks;
     t.classList.add("show");
     clearTimeout(pesan._t);
-    pesan._t = setTimeout(function(){ t.classList.remove("show"); }, 3000);
-  }
-  function keBlob(dataURL){
-    var p = dataURL.split(",");
-    var mime = (p[0].match(/:(.*?);/) || [null,"application/octet-stream"])[1];
-    var bin = atob(p[1]);
-    var arr = new Uint8Array(bin.length);
-    for(var i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
-    return new Blob([arr], {type:mime});
+    pesan._t = setTimeout(function(){ t.classList.remove("show"); }, 3200);
   }
 
   /* ---------- baca & kecilkan berkas ---------- */
-  function bacaDataURL(file){
+  function bacaDataURL(blob){
     return new Promise(function(res, rej){
       var r = new FileReader();
       r.onload = function(){ res(r.result); };
-      r.onerror = function(){ rej(new Error("gagal baca")); };
-      r.readAsDataURL(file);
+      r.onerror = function(){ rej(new Error("gagal baca berkas")); };
+      r.readAsDataURL(blob);
     });
   }
   function kecilkanGambar(file, maks, mutu){
@@ -664,11 +669,7 @@
         ctx.fillStyle = "#fff"; ctx.fillRect(0,0,w,h);
         ctx.drawImage(img, 0, 0, w, h);
         URL.revokeObjectURL(url);
-        if(c.toBlob){
-          c.toBlob(function(b){ b ? res(b) : rej(new Error("gagal olah gambar")); }, "image/jpeg", mutu);
-        }else{
-          res(keBlob(c.toDataURL("image/jpeg", mutu)));
-        }
+        c.toBlob(function(b){ b ? res(b) : rej(new Error("gagal olah gambar")); }, "image/jpeg", mutu);
       };
       img.onerror = function(){ URL.revokeObjectURL(url); rej(new Error("gagal muat gambar")); };
       img.src = url;
@@ -685,7 +686,7 @@
       return;
     }
     if(pdf && file.size > BATAS){
-      el("err-file").textContent = "PDF " + ukuran(file.size) + " terlalu besar. Kompres dulu di bawah 10 MB, atau unggah versi fotonya.";
+      el("err-file").textContent = "PDF " + ukuran(file.size) + " terlalu besar. Kompres dulu di bawah 8 MB, atau unggah versi fotonya.";
       el("err-file").classList.add("show");
       return;
     }
@@ -721,13 +722,19 @@
       " · " + ukuran(sj.ukuran) + " · " + tanggalID(sj.tanggal);
     var pv = el("lampiran-pratinjau");
     lepasPratinjau();
-    if(sj.tipe === "application/pdf" || !blob){
+    if(blob){
+      if(sj.tipe === "application/pdf"){
+        pv.style.backgroundImage = ""; pv.textContent = "PDF";
+      }else{
+        urlPratinjau = URL.createObjectURL(blob);
+        pv.textContent = ""; pv.style.backgroundImage = 'url("' + urlPratinjau + '")';
+      }
+    }else if(sj.fileId && sj.tipe !== "application/pdf"){
+      pv.textContent = "";
+      pv.style.backgroundImage = 'url("https://drive.google.com/thumbnail?id=' + sj.fileId + '&sz=w120")';
+    }else{
       pv.style.backgroundImage = "";
       pv.textContent = sj.tipe === "application/pdf" ? "PDF" : "IMG";
-    }else{
-      urlPratinjau = URL.createObjectURL(blob);
-      pv.textContent = "";
-      pv.style.backgroundImage = 'url("' + urlPratinjau + '")';
     }
   }
   function sembunyiLampiran(){
@@ -793,7 +800,7 @@
       '</tr>';
     }).join("");
 
-    el("kosong").hidden = data.length > 0;
+    el("kosong").hidden = data.length > 0 || !el("memuat").hidden;
     el("kaki-info").textContent = data.length + " baris ditampilkan dari " + baris.length + " total";
 
     var lengkap = baris.filter(function(b){ return statusDari(b) === "terbit"; }).length;
@@ -816,7 +823,7 @@
   }
 
   /* ---------- form ---------- */
-  async function bukaForm(data){
+  function bukaForm(data){
     sedangEdit = data || null;
     berkasBaru = null;
     berkasDilepas = false;
@@ -828,51 +835,67 @@
     sembunyiLampiran();
     el("backdrop").classList.add("open");
     setTimeout(function(){ el("in-brand").focus(); }, 30);
-    if(data && data.sj){
-      var d = await ambilBerkas(data.id);
-      if(sedangEdit === data) tampilLampiran(data.sj, d);
-    }
+    if(data && data.sj) tampilLampiran(data.sj, null);
   }
   function tutupForm(){
+    if(sibuk) return;
     el("backdrop").classList.remove("open");
     sedangEdit = null; berkasBaru = null; berkasDilepas = false;
   }
+  function kunciForm(nyala){
+    sibuk = nyala;
+    el("tunggu").hidden = !nyala;
+    el("btn-simpan").disabled = nyala;
+    el("btn-batal").disabled = nyala;
+    el("btn-tutup").disabled = nyala;
+  }
 
   async function simpanForm(){
+    if(sibuk) return;
     var brand = el("in-brand").value.trim();
-    var trfo  = el("in-trfo").value.trim();
+    var gr    = el("in-trfo").value.trim();
     var ok = true;
     el("err-brand").classList.toggle("show", !brand); if(!brand) ok = false;
-    el("err-trfo").classList.toggle("show", !trfo);   if(!trfo)  ok = false;
+    el("err-trfo").classList.toggle("show", !gr);     if(!gr)    ok = false;
     if(!ok) return;
 
-    var target;
-    if(sedangEdit){
-      target = sedangEdit;
-      target.brand = brand; target.trfo = trfo; target.kategori = KATEGORI;
-    }else{
-      target = {id:idBaru(), brand:brand, kategori:KATEGORI, trfo:trfo, sj:null};
-      baris.unshift(target);
-    }
+    var muatan = {
+      aksi: sedangEdit ? "ubah" : "tambah",
+      brand: brand,
+      gr: gr
+    };
+    if(sedangEdit) muatan.id = sedangEdit.id;
+    if(berkasDilepas && !berkasBaru) muatan.lepasBerkas = true;
 
-    if(berkasBaru){
-      target.sj = {nama:berkasBaru.nama, tipe:berkasBaru.tipe, ukuran:berkasBaru.ukuran, tanggal:berkasBaru.tanggal};
-      await simpanBerkas(target.id, berkasBaru.data);
-    }else if(berkasDilepas){
-      target.sj = null;
-      await hapusBerkas(target.id);
+    kunciForm(true);
+    try{
+      if(berkasBaru){
+        el("tunggu").innerHTML = '<span class="putar"></span>Mengunggah ' + lolos(berkasBaru.nama) + '…';
+        muatan.berkasNama = berkasBaru.nama;
+        muatan.berkasTipe = berkasBaru.tipe;
+        muatan.berkasData = await bacaDataURL(berkasBaru.data);
+      }else{
+        el("tunggu").innerHTML = '<span class="putar"></span>Menyimpan ke spreadsheet…';
+      }
+      tandai("sibuk", "Menyimpan…");
+      await panggil(muatan);
+      kunciForm(false);
+      el("backdrop").classList.remove("open");
+      sedangEdit = null; berkasBaru = null; berkasDilepas = false;
+      pesan(muatan.aksi === "ubah" ? "Baris " + gr + " diperbarui" : "GR " + gr + " ditambahkan");
+      await segarkan(true);
+    }catch(e){
+      kunciForm(false);
+      tandai("gagal", "Gagal menyimpan");
+      el("err-file").textContent = e.message;
+      el("err-file").classList.add("show");
+      pesan("Gagal menyimpan: " + e.message);
     }
-
-    pesan((sedangEdit ? "Baris " : "GR ") + trfo + (sedangEdit ? " diperbarui" : " ditambahkan"));
-    tutupForm();
-    gambar();
-    await simpanIndeks();
   }
 
   /* ---------- pratinjau ---------- */
-  async function bukaLihat(b){
-    var data = await ambilBerkas(b.id);
-    lihatKini = {baris:b, data:data};
+  function bukaLihat(b){
+    lihatKini = b;
     el("lihat-judul").textContent = "Surat jalan " + b.trfo;
     el("lihat-sub").textContent = b.brand + " · " + b.kategori;
     el("lihat-rincian").innerHTML =
@@ -881,26 +904,16 @@
       '<div><dt>Ukuran</dt><dd>' + ukuran(b.sj.ukuran) + '</dd></div>' +
       '<div><dt>Diunggah</dt><dd>' + tanggalID(b.sj.tanggal) + '</dd></div>';
 
-    var isi = el("lihat-isi");
-    if(!data){
-      isi.innerHTML = '<p style="margin:22px 0;color:var(--ink-soft);font-size:14px">' +
-        'Berkasnya tidak ada di penyimpanan browser ini. Unggah ulang lewat tombol ubah.</p>';
-      el("btn-unduh").disabled = true; el("btn-tab").disabled = true;
-    }else{
-      el("btn-unduh").disabled = false; el("btn-tab").disabled = false;
-      var url = URL.createObjectURL(data);
-      lihatKini.url = url;
-      isi.innerHTML = b.sj.tipe === "application/pdf"
-        ? '<iframe src="' + url + '" title="Pratinjau surat jalan"></iframe>'
-        : '<img src="' + url + '" alt="Surat jalan ' + lolos(b.trfo) + '">';
-    }
+    el("lihat-isi").innerHTML = b.sj.tipe === "application/pdf"
+      ? '<iframe src="https://drive.google.com/file/d/' + lolos(b.sj.fileId) + '/preview" title="Pratinjau surat jalan"></iframe>'
+      : '<img src="https://drive.google.com/thumbnail?id=' + lolos(b.sj.fileId) + '&sz=w1600" alt="Surat jalan ' + lolos(b.trfo) + '">';
+
     el("backdrop-lihat").classList.add("open");
     setTimeout(function(){ el("btn-tutup-lihat").focus(); }, 30);
   }
   function tutupLihat(){
     el("backdrop-lihat").classList.remove("open");
     el("lihat-isi").innerHTML = "";
-    if(lihatKini && lihatKini.url) URL.revokeObjectURL(lihatKini.url);
     lihatKini = null;
   }
 
@@ -909,12 +922,13 @@
     var data = terlihat();
     if(!data.length){ pesan("Tidak ada baris untuk diunduh"); return; }
     var kutip = function(s){ return '"' + String(s == null ? "" : s).replace(/"/g,'""') + '"'; };
-    var isi = ["Brand,Kategori,GR Number,Surat Jalan,Status,Tanggal Unggah"].concat(
+    var isi = ["Brand,Kategori,GR Number,Surat Jalan,Status,Tanggal Unggah,Link Berkas"].concat(
       data.map(function(b){
         return [b.brand, b.kategori, b.trfo,
                 b.sj ? b.sj.nama : "",
                 b.sj ? "Lengkap" : "Belum ada berkas",
-                b.sj ? tanggalID(b.sj.tanggal) : ""].map(kutip).join(",");
+                b.sj ? tanggalID(b.sj.tanggal) : "",
+                b.sj ? b.sj.link : ""].map(kutip).join(",");
       })
     ).join("\r\n");
     var url = URL.createObjectURL(new Blob(["\ufeff" + isi], {type:"text/csv;charset=utf-8;"}));
@@ -931,6 +945,7 @@
   el("btn-reset").addEventListener("click", function(){
     el("cari").value = ""; el("f-brand").value = ""; el("f-status").value = ""; gambar();
   });
+  el("btn-muat").addEventListener("click", function(){ segarkan(false); });
   el("btn-tambah").addEventListener("click", function(){ bukaForm(null); });
   el("btn-tambah-2").addEventListener("click", function(){ bukaForm(null); });
   el("btn-csv").addEventListener("click", unduhCSV);
@@ -942,16 +957,12 @@
   el("backdrop-lihat").addEventListener("click", function(e){ if(e.target === this) tutupLihat(); });
 
   el("btn-tab").addEventListener("click", function(){
-    if(lihatKini && lihatKini.url) window.open(lihatKini.url, "_blank", "noopener");
+    if(lihatKini) window.open(lihatKini.sj.link, "_blank", "noopener");
   });
   el("btn-unduh").addEventListener("click", function(){
-    if(!lihatKini || !lihatKini.url) return;
-    var a = document.createElement("a");
-    a.href = lihatKini.url; a.download = lihatKini.baris.sj.nama;
-    document.body.appendChild(a); a.click(); a.remove();
+    if(lihatKini) window.open("https://drive.google.com/uc?export=download&id=" + lihatKini.sj.fileId, "_blank", "noopener");
   });
 
-  // dropzone
   var drop = el("drop"), inFile = el("in-file");
   drop.addEventListener("click", function(){ inFile.click(); });
   drop.addEventListener("keydown", function(e){
@@ -1007,24 +1018,36 @@
     var aksi = btn.dataset.aksi;
     if(aksi === "lihat") return bukaLihat(b);
     if(aksi === "edit")  return bukaForm(b);
-    if(aksi === "hapus" && confirm("Hapus baris " + b.trfo + " beserta surat jalannya?")){
-      baris = baris.filter(function(x){ return x.id !== id; });
-      await hapusBerkas(id);
-      gambar();
-      await simpanIndeks();
-      pesan("Baris " + b.trfo + " dihapus");
+    if(aksi === "hapus"){
+      if(!confirm("Hapus baris " + b.trfo + " beserta surat jalannya? Baris ini hilang untuk semua orang.")) return;
+      tandai("sibuk", "Menghapus…");
+      try{
+        await panggil({aksi:"hapus", id:id});
+        pesan("Baris " + b.trfo + " dihapus");
+        await segarkan(true);
+      }catch(err){
+        tandai("gagal", "Gagal menghapus");
+        pesan("Gagal menghapus: " + err.message);
+      }
     }
   });
 
+  // segarkan berkala, hanya saat tab aktif dan tidak ada form terbuka
+  setInterval(function(){
+    if(document.hidden || sibuk) return;
+    if(el("backdrop").classList.contains("open")) return;
+    if(el("backdrop-lihat").classList.contains("open")) return;
+    segarkan(true);
+  }, JEDA_SEGAR);
+  document.addEventListener("visibilitychange", function(){
+    if(!document.hidden) segarkan(true);
+  });
+
   /* ---------- mulai ---------- */
-  (async function(){
-    var bln = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
-    var d = new Date();
-    el("f-periode").textContent = bln[d.getMonth()] + " " + d.getFullYear();
-    await muat();
-    el("kaki-simpan").textContent = labelGudang();
-    gambar();
-  })();
+  var bln = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+  var skrg = new Date();
+  el("f-periode").textContent = bln[skrg.getMonth()] + " " + skrg.getFullYear();
+  segarkan(false);
 })();
 </script>
 </body>
