@@ -367,7 +367,7 @@
     </div>
     <div class="kaki">
       <span id="kaki-info">0 baris</span>
-      <span id="kaki-simpan">Tersimpan otomatis</span>
+      <span id="kaki-simpan">Menyiapkan penyimpanan…</span>
     </div>
   </section>
 </div>
@@ -420,7 +420,7 @@
             </svg>
           </div>
           <b>Tarik berkas ke sini, atau klik untuk pilih</b>
-          <span>PDF, JPG, PNG &middot; maks 4 MB</span>
+          <span>PDF, JPG, PNG &middot; maks 10 MB</span>
         </div>
         <div class="lampiran" id="lampiran" hidden>
           <div class="lampiran__pratinjau" id="lampiran-pratinjau"></div>
@@ -478,7 +478,7 @@
 
   var KEY = "monitoring-retur:baris";
   var KEY_FILE = "monitoring-retur:berkas:";
-  var BATAS = 4 * 1024 * 1024;
+  var BATAS = 10 * 1024 * 1024;
   var KATEGORI = "Retur";
 
   var contoh = [
@@ -502,43 +502,109 @@
   var tbody = el("tbody");
 
   /* ---------- penyimpanan ---------- */
-  function adaGudang(){
-    return typeof window !== "undefined" && window.storage && typeof window.storage.set === "function";
-  }
-  async function muat(){
-    if(!adaGudang()){ baris = contoh.slice(); return; }
+  // indeks baris: localStorage. berkas surat jalan: IndexedDB (kuota jauh lebih besar).
+  var GUDANG = (function(){
+    if(typeof window !== "undefined" && window.storage && typeof window.storage.set === "function"){
+      return {
+        nama:"claude",
+        get:function(k){ return window.storage.get(k).then(function(h){ return h && h.value ? h.value : null; }); },
+        set:function(k,v){ return window.storage.set(k,v); },
+        del:function(k){ return window.storage.delete(k); }
+      };
+    }
     try{
-      var h = await window.storage.get(KEY);
-      baris = h && h.value ? JSON.parse(h.value) : contoh.slice();
+      window.localStorage.setItem("__uji__","1");
+      window.localStorage.removeItem("__uji__");
+      return {
+        nama:"lokal",
+        get:function(k){ return Promise.resolve(window.localStorage.getItem(k)); },
+        set:function(k,v){ window.localStorage.setItem(k,v); return Promise.resolve(); },
+        del:function(k){ window.localStorage.removeItem(k); return Promise.resolve(); }
+      };
+    }catch(e){}
+    var memori = {};
+    return {
+      nama:"memori",
+      get:function(k){ return Promise.resolve(k in memori ? memori[k] : null); },
+      set:function(k,v){ memori[k] = v; return Promise.resolve(); },
+      del:function(k){ delete memori[k]; return Promise.resolve(); }
+    };
+  })();
+
+  var DB = (function(){
+    var siap = null;
+    function buka(){
+      if(siap) return siap;
+      siap = new Promise(function(res, rej){
+        if(!window.indexedDB) return rej(new Error("tanpa indexedDB"));
+        var r = window.indexedDB.open("monitoring-retur", 1);
+        r.onupgradeneeded = function(){
+          if(!r.result.objectStoreNames.contains("berkas")) r.result.createObjectStore("berkas");
+        };
+        r.onsuccess = function(){ res(r.result); };
+        r.onerror = function(){ rej(r.error || new Error("gagal buka basis data")); };
+      });
+      return siap;
+    }
+    function tx(mode, fn){
+      return buka().then(function(d){
+        return new Promise(function(res, rej){
+          var t = d.transaction("berkas", mode);
+          var minta = fn(t.objectStore("berkas"));
+          t.oncomplete = function(){ res(minta ? minta.result : null); };
+          t.onerror = function(){ rej(t.error); };
+          t.onabort = function(){ rej(t.error); };
+        });
+      });
+    }
+    return {
+      simpan:function(id, blob){ return tx("readwrite", function(s){ return s.put(blob, id); }); },
+      ambil: function(id){ return tx("readonly",  function(s){ return s.get(id); }); },
+      hapus: function(id){ return tx("readwrite", function(s){ return s.delete(id); }); }
+    };
+  })();
+
+  function labelGudang(){
+    if(GUDANG.nama === "memori") return "Sesi ini saja — unduh CSV untuk arsip";
+    return "Tersimpan di browser ini";
+  }
+
+  async function muat(){
+    try{
+      var v = await GUDANG.get(KEY);
+      baris = v ? JSON.parse(v) : contoh.slice();
+      if(!Array.isArray(baris)) baris = contoh.slice();
     }catch(e){ baris = contoh.slice(); }
     baris.forEach(function(b){ b.kategori = KATEGORI; });
   }
   async function simpanIndeks(){
-    if(!adaGudang()){ el("kaki-simpan").textContent = "Sesi ini saja — unduh CSV untuk arsip"; return; }
     try{
-      await window.storage.set(KEY, JSON.stringify(baris));
-      el("kaki-simpan").textContent = "Tersimpan otomatis";
+      await GUDANG.set(KEY, JSON.stringify(baris));
+      el("kaki-simpan").textContent = labelGudang();
     }catch(e){ el("kaki-simpan").textContent = "Gagal menyimpan — unduh CSV untuk arsip"; }
   }
-  async function simpanBerkas(id, dataURL){
-    cache[id] = dataURL;
-    if(!adaGudang()) return;
-    try{ await window.storage.set(KEY_FILE + id, dataURL); }
-    catch(e){ pesan("Berkas terlalu besar untuk disimpan permanen — hanya tersedia di sesi ini"); }
+  async function simpanBerkas(id, blob){
+    cache[id] = blob;
+    try{ await DB.simpan(id, blob); return; }catch(e){}
+    try{ await GUDANG.set(KEY_FILE + id, await bacaDataURL(blob)); }
+    catch(e){ pesan("Berkas hanya tersimpan untuk sesi ini — ruang browser penuh"); }
   }
   async function ambilBerkas(id){
     if(cache[id]) return cache[id];
-    if(!adaGudang()) return null;
     try{
-      var h = await window.storage.get(KEY_FILE + id);
-      if(h && h.value){ cache[id] = h.value; return h.value; }
+      var b = await DB.ambil(id);
+      if(b){ cache[id] = b; return b; }
+    }catch(e){}
+    try{
+      var v = await GUDANG.get(KEY_FILE + id);
+      if(v){ cache[id] = keBlob(v); return cache[id]; }
     }catch(e){}
     return null;
   }
   async function hapusBerkas(id){
     delete cache[id];
-    if(!adaGudang()) return;
-    try{ await window.storage.delete(KEY_FILE + id); }catch(e){}
+    try{ await DB.hapus(id); }catch(e){}
+    try{ await GUDANG.del(KEY_FILE + id); }catch(e){}
   }
 
   /* ---------- bantu ---------- */
@@ -598,7 +664,11 @@
         ctx.fillStyle = "#fff"; ctx.fillRect(0,0,w,h);
         ctx.drawImage(img, 0, 0, w, h);
         URL.revokeObjectURL(url);
-        res(c.toDataURL("image/jpeg", mutu));
+        if(c.toBlob){
+          c.toBlob(function(b){ b ? res(b) : rej(new Error("gagal olah gambar")); }, "image/jpeg", mutu);
+        }else{
+          res(keBlob(c.toDataURL("image/jpeg", mutu)));
+        }
       };
       img.onerror = function(){ URL.revokeObjectURL(url); rej(new Error("gagal muat gambar")); };
       img.src = url;
@@ -615,24 +685,23 @@
       return;
     }
     if(pdf && file.size > BATAS){
-      el("err-file").textContent = "PDF " + ukuran(file.size) + " terlalu besar. Kompres dulu di bawah 4 MB, atau unggah versi fotonya.";
+      el("err-file").textContent = "PDF " + ukuran(file.size) + " terlalu besar. Kompres dulu di bawah 10 MB, atau unggah versi fotonya.";
       el("err-file").classList.add("show");
       return;
     }
     try{
-      var data = pdf ? await bacaDataURL(file) : await kecilkanGambar(file, 1800, .78);
-      var nyata = Math.round((data.length - (data.indexOf(",")+1)) * 0.75);
+      var blob = pdf ? file : await kecilkanGambar(file, 1800, .78);
       berkasBaru = {
         nama: file.name.replace(/\.(png|webp|jpeg)$/i, gbr ? ".jpg" : "$&"),
         tipe: pdf ? "application/pdf" : "image/jpeg",
-        ukuran: nyata,
-        data: data,
+        ukuran: blob.size,
+        data: blob,
         tanggal: new Date().toISOString()
       };
       berkasDilepas = false;
-      tampilLampiran(berkasBaru, data);
-      if(gbr && nyata < file.size * 0.9){
-        pesan("Gambar dikecilkan dari " + ukuran(file.size) + " ke " + ukuran(nyata));
+      tampilLampiran(berkasBaru, blob);
+      if(gbr && blob.size < file.size * 0.9){
+        pesan("Gambar dikecilkan dari " + ukuran(file.size) + " ke " + ukuran(blob.size));
       }
     }catch(e){
       el("err-file").textContent = "Berkas gagal dibaca. Coba unggah ulang.";
@@ -640,24 +709,31 @@
     }
   }
 
-  function tampilLampiran(sj, dataURL){
+  var urlPratinjau = null;
+  function lepasPratinjau(){
+    if(urlPratinjau){ URL.revokeObjectURL(urlPratinjau); urlPratinjau = null; }
+  }
+  function tampilLampiran(sj, blob){
     el("drop").hidden = true;
     el("lampiran").hidden = false;
     el("lampiran-nama").textContent = sj.nama;
     el("lampiran-meta").textContent = (sj.tipe === "application/pdf" ? "PDF" : "Gambar") +
       " · " + ukuran(sj.ukuran) + " · " + tanggalID(sj.tanggal);
     var pv = el("lampiran-pratinjau");
-    if(sj.tipe === "application/pdf" || !dataURL){
+    lepasPratinjau();
+    if(sj.tipe === "application/pdf" || !blob){
       pv.style.backgroundImage = "";
       pv.textContent = sj.tipe === "application/pdf" ? "PDF" : "IMG";
     }else{
+      urlPratinjau = URL.createObjectURL(blob);
       pv.textContent = "";
-      pv.style.backgroundImage = 'url("' + dataURL + '")';
+      pv.style.backgroundImage = 'url("' + urlPratinjau + '")';
     }
   }
   function sembunyiLampiran(){
     el("drop").hidden = false;
     el("lampiran").hidden = true;
+    lepasPratinjau();
     el("lampiran-pratinjau").style.backgroundImage = "";
     el("in-file").value = "";
   }
@@ -812,7 +888,7 @@
       el("btn-unduh").disabled = true; el("btn-tab").disabled = true;
     }else{
       el("btn-unduh").disabled = false; el("btn-tab").disabled = false;
-      var url = URL.createObjectURL(keBlob(data));
+      var url = URL.createObjectURL(data);
       lihatKini.url = url;
       isi.innerHTML = b.sj.tipe === "application/pdf"
         ? '<iframe src="' + url + '" title="Pratinjau surat jalan"></iframe>'
@@ -946,7 +1022,7 @@
     var d = new Date();
     el("f-periode").textContent = bln[d.getMonth()] + " " + d.getFullYear();
     await muat();
-    if(!adaGudang()) el("kaki-simpan").textContent = "Sesi ini saja — unduh CSV untuk arsip";
+    el("kaki-simpan").textContent = labelGudang();
     gambar();
   })();
 })();
