@@ -26,6 +26,7 @@
     --radius:4px;
   }
   *{box-sizing:border-box;}
+  [hidden]{display:none!important;}
   html,body{margin:0;padding:0;}
   body{
     background:var(--paper);
@@ -281,16 +282,6 @@
 </style>
 <style>
   /* tambahan untuk versi tersambung spreadsheet */
-  .kabar{
-    display:flex;gap:11px;align-items:flex-start;margin:18px 0 0;padding:13px 15px;
-    border:1px solid var(--carbon-pink-edge);border-left:3px solid var(--stamp-red);
-    border-radius:var(--radius);background:var(--carbon-pink);font-size:13.5px;line-height:1.55;
-  }
-  .kabar b{display:block;margin-bottom:2px;}
-  .kabar code{
-    font-family:"IBM Plex Mono",monospace;font-size:12px;background:rgba(255,255,255,.7);
-    padding:1px 4px;border-radius:2px;
-  }
   .sinkron{display:inline-flex;align-items:center;gap:6px;}
   .titik{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);flex:0 0 auto;}
   .titik--ok{background:var(--stamp-green);}
@@ -342,10 +333,6 @@
     </div>
   </header>
 
-  <div class="kabar" id="kabar" hidden>
-    <span aria-hidden="true">!</span>
-    <div id="kabar-teks"></div>
-  </div>
 
   <div class="bar">
     <div class="bar__search">
@@ -549,11 +536,6 @@
     var d = new Date();
     return String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
   }
-  function kabar(html){
-    el("kabar-teks").innerHTML = html;
-    el("kabar").hidden = false;
-  }
-  function tutupKabar(){ el("kabar").hidden = true; }
 
   /* ---------- panggil API ---------- */
   function belumDiatur(){
@@ -598,9 +580,7 @@
     if(belumDiatur()){
       el("memuat").hidden = true;
       tandai("gagal", "Belum tersambung");
-      kabar('<b>Halaman belum tersambung ke spreadsheet.</b>' +
-            'Buka <code>index.html</code>, cari baris <code>var API = "";</code> di bagian bawah, ' +
-            'lalu tempel alamat web app Apps Script di antara tanda kutip. Panduannya ada di berkas PANDUAN.md.');
+      pesan("Alamat web app belum diisi di index.html");
       gambar();
       return;
     }
@@ -608,14 +588,11 @@
     try{
       var data = await panggil(null);
       baris = data.map(keBaris);
-      tutupKabar();
       tandai("ok", "Tersinkron " + jamSekarang());
       pertamaKali = false;
     }catch(e){
       tandai("gagal", "Gagal ambil data");
-      if(!diamDiam || pertamaKali){
-        kabar('<b>Data gagal diambil.</b>' + lolos(e.message));
-      }
+      if(!diamDiam || pertamaKali) pesan("Data gagal diambil: " + e.message);
     }
     el("memuat").hidden = true;
     gambar();
