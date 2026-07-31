@@ -288,6 +288,29 @@
   .titik--sibuk{background:#C98A16;animation:kedip 1s ease-in-out infinite;}
   .titik--gagal{background:var(--stamp-red);}
   @keyframes kedip{0%,100%{opacity:1}50%{opacity:.25}}
+  /* dropdown brand */
+  .pilih{position:relative;}
+  .pilih__input{padding-right:58px;}
+  .pilih__panah{position:absolute;right:13px;top:50%;transform:translateY(-50%);color:var(--ink-soft);font-size:12px;pointer-events:none;}
+  .pilih__hapus{
+    position:absolute;right:31px;top:50%;transform:translateY(-50%);width:22px;height:22px;padding:0;
+    border:none;background:transparent;color:var(--ink-faint);font-size:17px;line-height:1;
+    display:inline-flex;align-items:center;justify-content:center;border-radius:3px;
+  }
+  .pilih__hapus:hover{background:#EDEBE4;color:var(--ink);border:none;}
+  .pilih__daftar{
+    position:fixed;z-index:70;background:var(--sheet);border:1px solid var(--rule-strong);
+    border-radius:var(--radius);box-shadow:0 12px 30px rgba(20,24,29,.2);overflow-y:auto;padding-bottom:4px;
+  }
+  .pilih__grup{
+    position:sticky;top:0;background:#FAF9F6;border-bottom:1px solid var(--rule);
+    font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-faint);padding:7px 12px 6px;
+  }
+  .pilih__opsi{padding:8px 12px;font-size:14px;cursor:pointer;}
+  .pilih__opsi:hover,.pilih__opsi.sorot{background:var(--blue-wash);}
+  .pilih__opsi mark{background:var(--carbon-yellow);color:inherit;padding:0 1px;border-radius:2px;}
+  .pilih__nihil{padding:16px 12px;font-size:13px;color:var(--ink-faint);text-align:center;}
   .memuat{padding:48px 24px;text-align:center;color:var(--ink-soft);font-size:14px;}
   .putar{
     display:inline-block;width:15px;height:15px;margin-right:8px;vertical-align:-3px;
@@ -416,9 +439,15 @@
     <div class="modal__body">
       <div>
         <label class="lbl" for="in-brand">Brand</label>
-        <input type="text" id="in-brand" list="dl-brand" placeholder="HEYMALE" autocomplete="off">
-        <datalist id="dl-brand"></datalist>
-        <p class="err" id="err-brand">Brand wajib diisi.</p>
+        <div class="pilih">
+          <input type="text" id="in-brand" class="pilih__input" placeholder="Cari atau pilih toko"
+                 autocomplete="off" role="combobox" aria-expanded="false"
+                 aria-controls="pilih-daftar" aria-autocomplete="list">
+          <button type="button" class="pilih__hapus" id="pilih-hapus" hidden aria-label="Kosongkan pilihan">&times;</button>
+          <span class="pilih__panah" aria-hidden="true">&#9662;</span>
+        </div>
+        <div class="pilih__daftar" id="pilih-daftar" role="listbox" aria-label="Daftar toko" hidden></div>
+        <p class="err" id="err-brand">Pilih salah satu toko dari daftar.</p>
       </div>
       <div>
         <label class="lbl" for="in-kat">Kategori</label>
@@ -790,14 +819,219 @@
   }
 
   function isiBrand(){
-    var sel = el("f-brand"), dl = el("dl-brand"), lama = sel.value, opsi = [];
+    var sel = el("f-brand"), lama = sel.value, opsi = [];
     baris.forEach(function(b){ if(b.brand && opsi.indexOf(b.brand) < 0) opsi.push(b.brand); });
     opsi.sort(function(a,b){ return a.localeCompare(b,"id"); });
     sel.innerHTML = '<option value="">Semua brand</option>' +
       opsi.map(function(o){ return '<option>' + lolos(o) + '</option>'; }).join("");
     sel.value = opsi.indexOf(lama) > -1 ? lama : "";
-    dl.innerHTML = opsi.map(function(o){ return '<option value="' + lolos(o) + '">'; }).join("");
   }
+
+  /* ---------- daftar toko ---------- */
+  var DAFTAR_BRAND = [
+    {grup:"HEYLOCAL", isi:[
+      "Heylocal Aceh",
+      "HEYLOCAL BALIKPAPAN",
+      "Heylocal BXC Deal POS",
+      "Heylocal Jambi",
+      "Heylocal Lampung",
+      "Heylocal Makassar",
+      "HEYLOCAL MEDAN OCBC",
+      "Heylocal Padang",
+      "Heylocal Pakuwon Mall Bekasi",
+      "Heylocal Palembang",
+      "Heylocal Paskal Bandung",
+      "Heylocal Pejaten",
+      "Heylocal Pekanbaru",
+      "Heylocal Samarinda",
+      "HEYLOCAL SEMARANG",
+      "Heylocal Sentul",
+      "Heylocal SuMaBa",
+      "Heylocal Summarecon Mall Bekasi",
+      "Heylocal Sungai Penuh",
+      "Heylocal Sunplaza Medan",
+      "HEYLOCAL YOGYAKARTA",
+      "HSC PIM",
+      "HSC TP"
+    ]},
+    {grup:"HEYMALE", isi:[
+      "Heymale Aceh",
+      "Heymale BXC",
+      "Heymale Makassar",
+      "HEYMALE MUKU BLOK M",
+      "HEYMALE MUKU SURABAYA",
+      "Heymale Padang",
+      "Heymale Palembang",
+      "Heymale Paskal Bandung",
+      "Heymale Pekanbaru",
+      "Heymale PIM",
+      "Heymale Puri",
+      "Heymale Semarang",
+      "Heymale Sun Plaza Medan",
+      "Heymale Sungai Penuh"
+    ]}
+  ];
+
+  /* ---------- dropdown brand yang bisa dicari ---------- */
+  var kotakBrand = (function(){
+    var input   = el("in-brand");
+    var daftar  = el("pilih-daftar");
+    var tblHapus = el("pilih-hapus");
+    var terbuka = false, sorot = -1, tampil = [], sah = "", tambahan = null;
+
+    function semua(){
+      var out = [];
+      DAFTAR_BRAND.forEach(function(g){
+        g.isi.forEach(function(n){ out.push({grup:g.grup, nama:n}); });
+      });
+      if(tambahan) out.unshift({grup:"Data lama", nama:tambahan});
+      return out;
+    }
+    function cocok(n){
+      return semua().filter(function(o){ return o.nama.toLowerCase() === String(n).toLowerCase(); })[0];
+    }
+    function tandaiCocok(teks, q){
+      if(!q) return lolos(teks);
+      var i = teks.toLowerCase().indexOf(q.toLowerCase());
+      if(i < 0) return lolos(teks);
+      return lolos(teks.slice(0, i)) + "<mark>" + lolos(teks.slice(i, i + q.length)) +
+             "</mark>" + lolos(teks.slice(i + q.length));
+    }
+
+    function letakkan(){
+      var r = input.getBoundingClientRect();
+      var bawah = window.innerHeight - r.bottom;
+      daftar.style.left  = r.left + "px";
+      daftar.style.width = r.width + "px";
+      if(bawah < 190 && r.top > bawah){
+        daftar.style.top = "auto";
+        daftar.style.bottom = (window.innerHeight - r.top + 6) + "px";
+        daftar.style.maxHeight = Math.min(280, r.top - 16) + "px";
+      }else{
+        daftar.style.bottom = "auto";
+        daftar.style.top = (r.bottom + 6) + "px";
+        daftar.style.maxHeight = Math.min(280, bawah - 16) + "px";
+      }
+    }
+
+    function isi(){
+      var q = input.value.trim();
+      var samaPersis = !!cocok(q);
+      tampil = semua().filter(function(o){
+        if(!q || samaPersis) return true;
+        return (o.nama + " " + o.grup).toLowerCase().indexOf(q.toLowerCase()) > -1;
+      });
+
+      if(!tampil.length){
+        daftar.innerHTML = '<div class="pilih__nihil">Tidak ada toko yang cocok</div>';
+        return;
+      }
+      var grupKini = null, html = "";
+      tampil.forEach(function(o, i){
+        if(o.grup !== grupKini){
+          grupKini = o.grup;
+          html += '<div class="pilih__grup">' + lolos(o.grup) + '</div>';
+        }
+        html += '<div class="pilih__opsi' + (i === sorot ? " sorot" : "") + '" role="option" data-i="' + i + '"' +
+                (i === sorot ? ' aria-selected="true"' : '') + '>' +
+                '<span>' + tandaiCocok(o.nama, samaPersis ? "" : q) + '</span></div>';
+      });
+      daftar.innerHTML = html;
+    }
+
+    function buka(){
+      if(terbuka) return;
+      terbuka = true;
+      sorot = tampil.length ? 0 : -1;
+      daftar.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+      isi();
+      letakkan();
+      geserKeSorot();
+    }
+    function tutup(){
+      if(!terbuka) return;
+      terbuka = false;
+      daftar.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      sorot = -1;
+    }
+    function geserKeSorot(){
+      var n = daftar.querySelector('.pilih__opsi[data-i="' + sorot + '"]');
+      if(n && n.scrollIntoView) n.scrollIntoView({block:"nearest"});
+    }
+    function pilih(i){
+      var o = tampil[i];
+      if(!o) return;
+      sah = o.nama;
+      input.value = o.nama;
+      tblHapus.hidden = false;
+      tutup();
+      el("err-brand").classList.remove("show");
+    }
+    function pulihkan(){
+      input.value = sah;
+      tblHapus.hidden = !sah;
+    }
+
+    input.addEventListener("focus", function(){ sorot = 0; buka(); });
+    input.addEventListener("click", function(){ buka(); });
+    input.addEventListener("input", function(){
+      tblHapus.hidden = !input.value;
+      sorot = 0;
+      if(!terbuka) buka(); else { isi(); letakkan(); }
+    });
+    input.addEventListener("blur", function(){
+      setTimeout(function(){
+        if(daftar.contains(document.activeElement)) return;
+        var o = cocok(input.value.trim());
+        if(o){ sah = o.nama; input.value = o.nama; }
+        else { pulihkan(); }
+        tutup();
+      }, 120);
+    });
+    input.addEventListener("keydown", function(e){
+      if(e.key === "ArrowDown" || e.key === "ArrowUp"){
+        e.preventDefault();
+        if(!terbuka) return buka();
+        sorot += (e.key === "ArrowDown" ? 1 : -1);
+        if(sorot < 0) sorot = tampil.length - 1;
+        if(sorot >= tampil.length) sorot = 0;
+        isi(); geserKeSorot();
+      }else if(e.key === "Enter"){
+        if(terbuka && sorot > -1){ e.preventDefault(); e.stopPropagation(); pilih(sorot); }
+      }else if(e.key === "Escape"){
+        if(terbuka){ e.preventDefault(); e.stopPropagation(); pulihkan(); tutup(); }
+      }else if(e.key === "Tab"){
+        if(terbuka && sorot > -1) pilih(sorot);
+      }
+    });
+
+    daftar.addEventListener("mousedown", function(e){ e.preventDefault(); });
+    daftar.addEventListener("click", function(e){
+      var n = e.target.closest(".pilih__opsi");
+      if(n) pilih(Number(n.dataset.i));
+    });
+    tblHapus.addEventListener("click", function(){
+      sah = ""; input.value = ""; tblHapus.hidden = true;
+      input.focus(); sorot = 0; isi(); letakkan();
+    });
+    window.addEventListener("resize", function(){ if(terbuka) letakkan(); });
+    window.addEventListener("scroll", function(){ if(terbuka) letakkan(); }, true);
+
+    return {
+      setel: function(nilai){
+        nilai = nilai || "";
+        tambahan = (nilai && !cocok(nilai)) ? nilai : null;   // toleransi data lama
+        sah = nilai;
+        input.value = nilai;
+        tblHapus.hidden = !nilai;
+        tutup();
+      },
+      nilai: function(){ return sah; },
+      tutup: tutup
+    };
+  })();
 
   /* ---------- form ---------- */
   function bukaForm(data){
@@ -805,7 +1039,7 @@
     berkasBaru = null;
     berkasDilepas = false;
     el("modal-judul").textContent = data ? "Ubah GR" : "Tambah GR";
-    el("in-brand").value = data ? data.brand : "";
+    kotakBrand.setel(data ? data.brand : "");
     el("in-trfo").value  = data ? data.trfo : "";
     el("in-kat").value   = KATEGORI;
     ["err-brand","err-trfo","err-file"].forEach(function(i){ el(i).classList.remove("show"); });
@@ -816,6 +1050,7 @@
   }
   function tutupForm(){
     if(sibuk) return;
+    kotakBrand.tutup();
     el("backdrop").classList.remove("open");
     sedangEdit = null; berkasBaru = null; berkasDilepas = false;
   }
@@ -829,7 +1064,7 @@
 
   async function simpanForm(){
     if(sibuk) return;
-    var brand = el("in-brand").value.trim();
+    var brand = kotakBrand.nilai().trim();
     var gr    = el("in-trfo").value.trim();
     var ok = true;
     el("err-brand").classList.toggle("show", !brand); if(!brand) ok = false;
