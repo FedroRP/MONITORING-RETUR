@@ -57,7 +57,7 @@
   }
   .kop__org{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-soft);text-align:right;line-height:1.7;}
   .kop__org b{display:block;color:var(--ink);font-weight:600;letter-spacing:.04em;}
-  .kop__fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));}
+  .kop__fields{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));}
   .field{padding:14px 24px 16px;border-right:1px dashed var(--rule-strong);}
   .field:last-child{border-right:none;}
   .field__label{
@@ -105,7 +105,7 @@
     overflow:hidden;box-shadow:0 1px 0 var(--rule);
   }
   .scroll{overflow-x:auto;}
-  table{width:100%;border-collapse:collapse;min-width:860px;}
+  table{width:100%;border-collapse:collapse;min-width:960px;}
   thead th{
     font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.14em;
     text-transform:uppercase;color:var(--ink-soft);text-align:left;padding:11px 16px;
@@ -116,6 +116,8 @@
   thead th .arrow{opacity:0;margin-left:5px;}
   thead th[aria-sort] .arrow{opacity:1;color:var(--blue);}
   th.num,td.num{width:52px;text-align:right;color:var(--ink-faint);}
+  th.angka,td.angka{text-align:right;width:76px;}
+  td.angka{font-family:"IBM Plex Mono",monospace;font-size:13.5px;font-weight:600;}
   tbody td{padding:11px 16px;border-bottom:1px solid var(--rule);vertical-align:middle;font-size:14px;}
   tbody tr:last-child td{border-bottom:none;}
   tbody tr:hover td{background:#FBFAF7;}
@@ -257,6 +259,8 @@
     .kop__fields{grid-template-columns:repeat(2,1fr);}
     .field{border-bottom:1px dashed var(--rule-strong);}
     .field:nth-child(2n){border-right:none;}
+    .field:last-child{border-bottom:none;}
+    td.angka{text-align:left;}
     .kop__org{text-align:left;}
     table{min-width:0;}
     thead{display:none;}
@@ -353,6 +357,10 @@
         <span class="field__label">Belum ada berkas</span>
         <span class="field__value" id="f-belum">0</span>
       </div>
+      <div class="field">
+        <span class="field__label">Total koli</span>
+        <span class="field__value" id="f-koli">0</span>
+      </div>
     </div>
   </header>
 
@@ -401,6 +409,7 @@
             <th class="sortable" data-key="brand">Brand <span class="arrow">↕</span></th>
             <th class="sortable" data-key="kategori">Kategori <span class="arrow">↕</span></th>
             <th class="sortable" data-key="trfo">GR Number <span class="arrow">↕</span></th>
+            <th class="sortable angka" data-key="koli">Koli <span class="arrow">↕</span></th>
             <th class="sortable" data-key="surat">Surat Jalan <span class="arrow">↕</span></th>
             <th class="sortable" data-key="status">Status <span class="arrow">↕</span></th>
             <th style="text-align:right">Aksi</th>
@@ -464,6 +473,12 @@
         <label class="lbl" for="in-trfo">GR Number</label>
         <input type="text" id="in-trfo" placeholder="GR-2607-0031" autocomplete="off">
         <p class="err" id="err-trfo">GR Number wajib diisi.</p>
+      </div>
+      <div>
+        <label class="lbl" for="in-koli">Total koli</label>
+        <input type="text" id="in-koli" inputmode="numeric" placeholder="12" autocomplete="off">
+        <p class="hint">Jumlah koli yang diterima. Boleh dikosongkan dulu kalau belum dihitung.</p>
+        <p class="err" id="err-koli">Total koli harus berupa angka bulat.</p>
       </div>
       <div>
         <label class="lbl" for="in-file">Surat jalan</label>
@@ -594,6 +609,7 @@
       brand: r.brand,
       kategori: KATEGORI,
       trfo: r.gr,
+      koli: (r.koli === "" || r.koli === null || r.koli === undefined) ? "" : Number(r.koli),
       sj: r.berkasId ? {
         nama: r.berkasNama || "surat-jalan",
         tipe: r.berkasTipe || "application/pdf",
@@ -763,6 +779,10 @@
     });
     hasil.sort(function(x,y){
       var a, b;
+      if(urut.key === "koli"){
+        var ax = x.koli === "" ? -1 : Number(x.koli), ay = y.koli === "" ? -1 : Number(y.koli);
+        return (ax - ay) * urut.arah;
+      }
       if(urut.key === "status"){ a = statusDari(x); b = statusDari(y); }
       else if(urut.key === "surat"){ a = x.sj ? x.sj.nama : "\uffff"; b = y.sj ? y.sj.nama : "\uffff"; }
       else { a = x[urut.key] || "\uffff"; b = y[urut.key] || "\uffff"; }
@@ -792,6 +812,7 @@
         '<td data-label="Brand"><span class="brand">' + lolos(b.brand) + '</span></td>' +
         '<td data-label="Kategori"><span class="kat">' + lolos(b.kategori) + '</span></td>' +
         '<td class="mono trfo" data-label="GR Number">' + lolos(b.trfo) + '</td>' +
+        '<td class="angka" data-label="Koli">' + (b.koli === "" ? '<span class="kosong">—</span>' : lolos(b.koli)) + '</td>' +
         '<td data-label="Surat jalan">' + sel + '</td>' +
         '<td data-label="Status"><span class="stamp stamp--' + st + '">' +
           (st === "terbit" ? "Lengkap" : "Belum ada berkas") + '</span></td>' +
@@ -814,6 +835,9 @@
     el("f-terbit").firstChild.nodeValue = lengkap;
     el("f-persen").textContent = baris.length ? Math.round(lengkap / baris.length * 100) + "%" : "0%";
     el("f-belum").textContent = baris.length - lengkap;
+    el("f-koli").textContent = baris.reduce(function(t, b){
+      return t + (b.koli === "" ? 0 : Number(b.koli) || 0);
+    }, 0).toLocaleString("id-ID");
 
     isiBrand();
   }
@@ -1041,8 +1065,9 @@
     el("modal-judul").textContent = data ? "Ubah GR" : "Tambah GR";
     kotakBrand.setel(data ? data.brand : "");
     el("in-trfo").value  = data ? data.trfo : "";
+    el("in-koli").value  = data && data.koli !== "" ? data.koli : "";
     el("in-kat").value   = KATEGORI;
-    ["err-brand","err-trfo","err-file"].forEach(function(i){ el(i).classList.remove("show"); });
+    ["err-brand","err-trfo","err-koli","err-file"].forEach(function(i){ el(i).classList.remove("show"); });
     sembunyiLampiran();
     el("backdrop").classList.add("open");
     setTimeout(function(){ el("in-brand").focus(); }, 30);
@@ -1066,15 +1091,19 @@
     if(sibuk) return;
     var brand = kotakBrand.nilai().trim();
     var gr    = el("in-trfo").value.trim();
+    var koli  = el("in-koli").value.trim().replace(/[.\s]/g, "");
+    var koliSah = koli === "" || /^\d+$/.test(koli);
     var ok = true;
     el("err-brand").classList.toggle("show", !brand); if(!brand) ok = false;
     el("err-trfo").classList.toggle("show", !gr);     if(!gr)    ok = false;
+    el("err-koli").classList.toggle("show", !koliSah); if(!koliSah) ok = false;
     if(!ok) return;
 
     var muatan = {
       aksi: sedangEdit ? "ubah" : "tambah",
       brand: brand,
-      gr: gr
+      gr: gr,
+      koli: koli
     };
     if(sedangEdit) muatan.id = sedangEdit.id;
     if(berkasDilepas && !berkasBaru) muatan.lepasBerkas = true;
@@ -1134,9 +1163,9 @@
     var data = terlihat();
     if(!data.length){ pesan("Tidak ada baris untuk diunduh"); return; }
     var kutip = function(s){ return '"' + String(s == null ? "" : s).replace(/"/g,'""') + '"'; };
-    var isi = ["Brand,Kategori,GR Number,Surat Jalan,Status,Tanggal Unggah,Link Berkas"].concat(
+    var isi = ["Brand,Kategori,GR Number,Total Koli,Surat Jalan,Status,Tanggal Unggah,Link Berkas"].concat(
       data.map(function(b){
-        return [b.brand, b.kategori, b.trfo,
+        return [b.brand, b.kategori, b.trfo, b.koli,
                 b.sj ? b.sj.nama : "",
                 b.sj ? "Lengkap" : "Belum ada berkas",
                 b.sj ? tanggalID(b.sj.tanggal) : "",
