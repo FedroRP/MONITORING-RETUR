@@ -57,18 +57,18 @@
   }
   .kop__org{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-soft);text-align:right;line-height:1.7;}
   .kop__org b{display:block;color:var(--ink);font-weight:600;letter-spacing:.04em;}
-  .kop__fields{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));}
-  .field{padding:14px 24px 16px;border-right:1px dashed var(--rule-strong);}
+  .kop__fields{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));}
+  .field{padding:14px 17px 16px;border-right:1px dashed var(--rule-strong);}
   .field:last-child{border-right:none;}
   .field__label{
     font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.14em;
     text-transform:uppercase;color:var(--ink-faint);display:block;margin-bottom:4px;
   }
-  .field__value{font-family:"Archivo",sans-serif;font-weight:600;font-size:26px;line-height:1.1;letter-spacing:-.01em;}
+  .field__value{font-family:"Archivo",sans-serif;font-weight:600;font-size:23px;line-height:1.1;letter-spacing:-.01em;}
   .field__value small{font-size:13px;font-weight:500;color:var(--ink-soft);margin-left:4px;}
   .field--pink .field__value{color:var(--stamp-red);}
   .field--green .field__value{color:var(--stamp-green);}
-  .field--periode .field__value{font-size:17px;font-family:"IBM Plex Mono",monospace;font-weight:500;}
+  .field--periode .field__value{font-size:15px;font-family:"IBM Plex Mono",monospace;font-weight:500;}
 
   /* ---------- toolbar ---------- */
   .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:22px 0 14px;}
@@ -105,7 +105,7 @@
     overflow:hidden;box-shadow:0 1px 0 var(--rule);
   }
   .scroll{overflow-x:auto;}
-  table{width:100%;border-collapse:collapse;min-width:960px;}
+  table{width:100%;border-collapse:collapse;min-width:1090px;}
   thead th{
     font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.14em;
     text-transform:uppercase;color:var(--ink-soft);text-align:left;padding:11px 16px;
@@ -160,6 +160,25 @@
   .ico{width:30px;height:30px;padding:0;justify-content:center;border-color:transparent;background:transparent;color:var(--ink-soft);}
   .ico:hover{background:#EDEBE4;border-color:transparent;color:var(--ink);}
   .ico.danger:hover{background:var(--carbon-pink);color:var(--stamp-red);}
+
+  /* tombol kedatangan */
+  th.tengah,td.tengah{text-align:center;width:96px;}
+  .datang{
+    width:34px;height:34px;padding:0;justify-content:center;border-radius:var(--radius);
+    border:1.5px solid currentColor;
+  }
+  .datang--ya{color:var(--stamp-green);background:#E6F1EA;}
+  .datang--ya:hover{background:#D6E8DE;border-color:currentColor;}
+  .datang--tidak{color:var(--stamp-red);background:var(--carbon-pink);border-style:dashed;}
+  .datang--tidak:hover{background:#F0CBD2;border-color:currentColor;}
+  .datang[disabled]{opacity:.45;}
+
+  /* saklar di dalam form */
+  .segmen{display:flex;gap:8px;}
+  .segmen button{flex:1;justify-content:center;font-size:13.5px;}
+  .segmen button.aktif{border-color:var(--ink);background:var(--sheet);font-weight:600;box-shadow:inset 0 0 0 1px var(--ink);}
+  .segmen button[data-nilai="1"].aktif{color:var(--stamp-green);border-color:var(--stamp-green);box-shadow:inset 0 0 0 1px var(--stamp-green);}
+  .segmen button[data-nilai="0"].aktif{color:var(--stamp-red);border-color:var(--stamp-red);box-shadow:inset 0 0 0 1px var(--stamp-red);}
 
   .kosong-state{padding:56px 24px;text-align:center;}
   .kosong-state h3{font-family:"Archivo",sans-serif;font-size:18px;margin:0 0 6px;}
@@ -266,6 +285,7 @@
     .kop__fields{grid-template-columns:repeat(2,1fr);}
     .field{border-bottom:1px dashed var(--rule-strong);}
     .field:nth-child(2n){border-right:none;}
+    .field__value{font-size:24px;}
     .field:last-child{border-bottom:none;}
     td.angka{text-align:left;}
     .kop__org{text-align:left;}
@@ -282,9 +302,14 @@
     tr[data-status] td:first-child{box-shadow:none;}
     tbody tr[data-status="belum"]{border-left:3px solid var(--carbon-pink-edge);}
     tbody tr[data-status="terbit"]{border-left:3px solid var(--stamp-green);}
+    td.tengah{justify-content:space-between;}
     td.aksi{justify-content:flex-end;padding-top:8px;}
     td.aksi::before{margin-right:auto;}
     .lihat iframe{height:52vh;}
+  }
+  @media (max-width:1040px) and (min-width:761px){
+    .kop__fields{grid-template-columns:repeat(3,minmax(0,1fr));}
+    .field:nth-child(3n){border-right:none;}
   }
   @media (prefers-reduced-motion:reduce){
     *{animation:none!important;transition:none!important;}
@@ -368,6 +393,10 @@
         <span class="field__label">Total koli</span>
         <span class="field__value" id="f-koli">0</span>
       </div>
+      <div class="field field--green">
+        <span class="field__label">Sudah diterima</span>
+        <span class="field__value" id="f-datang">0<small id="f-datang-persen">0%</small></span>
+      </div>
     </div>
   </header>
 
@@ -385,6 +414,11 @@
       <option value="">Semua status</option>
       <option value="terbit">Surat jalan sudah diunggah</option>
       <option value="belum">Belum ada berkas</option>
+    </select>
+    <select id="f-datang-saring" aria-label="Saring kedatangan">
+      <option value="">Semua kedatangan</option>
+      <option value="ya">Sudah diterima</option>
+      <option value="tidak">Belum diterima</option>
     </select>
     <button class="btn-ghost" id="btn-reset" type="button">Atur ulang</button>
     <button id="btn-muat" type="button">
@@ -417,6 +451,7 @@
             <th class="sortable" data-key="kategori">Kategori <span class="arrow">↕</span></th>
             <th class="sortable" data-key="trfo">GR Number <span class="arrow">↕</span></th>
             <th class="sortable angka" data-key="koli">Koli <span class="arrow">↕</span></th>
+            <th class="sortable tengah" data-key="datang">Kedatangan <span class="arrow">↕</span></th>
             <th class="sortable" data-key="surat">Surat Jalan <span class="arrow">↕</span></th>
             <th class="sortable" data-key="status">Status <span class="arrow">↕</span></th>
             <th style="text-align:right">Aksi</th>
@@ -486,6 +521,20 @@
         <input type="text" id="in-koli" inputmode="numeric" placeholder="12" autocomplete="off">
         <p class="hint">Jumlah koli yang diterima. Boleh dikosongkan dulu kalau belum dihitung.</p>
         <p class="err" id="err-koli">Total koli harus berupa angka bulat.</p>
+      </div>
+      <div>
+        <label class="lbl">Kedatangan</label>
+        <div class="segmen" id="in-datang">
+          <button type="button" data-nilai="0" class="aktif">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Belum diterima
+          </button>
+          <button type="button" data-nilai="1">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Sudah diterima
+          </button>
+        </div>
+        <p class="hint">Bisa diubah kapan saja langsung dari tabel.</p>
       </div>
       <div>
         <label class="lbl" for="in-file">Surat jalan <span class="wajib">wajib</span></label>
@@ -612,6 +661,7 @@
       kategori: KATEGORI,
       trfo: r.gr,
       koli: (r.koli === "" || r.koli === null || r.koli === undefined) ? "" : Number(r.koli),
+      datang: r.datang === true || String(r.datang).toLowerCase() === "true",
       sj: r.berkasId ? {
         nama: r.berkasNama || "surat-jalan",
         tipe: r.berkasTipe || "application/pdf",
@@ -773,10 +823,11 @@
   /* ---------- saring & gambar ---------- */
   function terlihat(){
     var q = el("cari").value.trim().toLowerCase();
-    var fb = el("f-brand").value, fs = el("f-status").value;
+    var fb = el("f-brand").value, fs = el("f-status").value, fd = el("f-datang-saring").value;
     var hasil = baris.filter(function(b){
       if(fb && b.brand !== fb) return false;
       if(fs && statusDari(b) !== fs) return false;
+      if(fd && (fd === "ya") !== !!b.datang) return false;
       if(!q) return true;
       return (b.brand + " " + b.kategori + " " + b.trfo + " " + (b.sj ? b.sj.nama : "")).toLowerCase().indexOf(q) > -1;
     });
@@ -786,6 +837,7 @@
         var ax = x.koli === "" ? -1 : Number(x.koli), ay = y.koli === "" ? -1 : Number(y.koli);
         return (ax - ay) * urut.arah;
       }
+      if(urut.key === "datang") return ((y.datang?1:0) - (x.datang?1:0)) * urut.arah;
       if(urut.key === "status"){ a = statusDari(x); b = statusDari(y); }
       else if(urut.key === "surat"){ a = x.sj ? x.sj.nama : "\uffff"; b = y.sj ? y.sj.nama : "\uffff"; }
       else { a = x[urut.key] || "\uffff"; b = y[urut.key] || "\uffff"; }
@@ -816,6 +868,15 @@
         '<td data-label="Kategori"><span class="kat">' + lolos(b.kategori) + '</span></td>' +
         '<td class="mono trfo" data-label="GR Number">' + lolos(b.trfo) + '</td>' +
         '<td class="angka" data-label="Koli">' + (b.koli === "" ? '<span class="kosong">—</span>' : lolos(b.koli)) + '</td>' +
+        '<td class="tengah" data-label="Kedatangan">' +
+          '<button class="datang ' + (b.datang ? "datang--ya" : "datang--tidak") + '" data-aksi="datang" ' +
+            'title="' + (b.datang ? "Sudah diterima — klik untuk membatalkan" : "Belum diterima — klik bila barang sudah sampai") + '" ' +
+            'aria-label="Kedatangan ' + lolos(b.trfo) + ': ' + (b.datang ? "sudah diterima" : "belum diterima") + '">' +
+            (b.datang
+              ? '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3.5 3.5L13 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+              : '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>') +
+          '</button>' +
+        '</td>' +
         '<td data-label="Surat jalan">' + sel + '</td>' +
         '<td data-label="Status"><span class="stamp stamp--' + st + '">' +
           (st === "terbit" ? "Lengkap" : "Belum ada berkas") + '</span></td>' +
@@ -841,6 +902,10 @@
     el("f-koli").textContent = baris.reduce(function(t, b){
       return t + (b.koli === "" ? 0 : Number(b.koli) || 0);
     }, 0).toLocaleString("id-ID");
+
+    var tiba = baris.filter(function(b){ return b.datang; }).length;
+    el("f-datang").firstChild.nodeValue = tiba;
+    el("f-datang-persen").textContent = baris.length ? Math.round(tiba / baris.length * 100) + "%" : "0%";
 
     isiBrand();
   }
@@ -1060,6 +1125,24 @@
     };
   })();
 
+  /* ---------- saklar kedatangan di form ---------- */
+  var saklarDatang = (function(){
+    var kotak = el("in-datang");
+    var nilai = false;
+    kotak.addEventListener("click", function(e){
+      var b = e.target.closest("button[data-nilai]");
+      if(!b) return;
+      setel(b.dataset.nilai === "1");
+    });
+    function setel(v){
+      nilai = !!v;
+      kotak.querySelectorAll("button[data-nilai]").forEach(function(b){
+        b.classList.toggle("aktif", (b.dataset.nilai === "1") === nilai);
+      });
+    }
+    return {setel:setel, nilai:function(){ return nilai; }};
+  })();
+
   /* ---------- form ---------- */
   function bukaForm(data){
     sedangEdit = data || null;
@@ -1069,6 +1152,7 @@
     kotakBrand.setel(data ? data.brand : "");
     el("in-trfo").value  = data ? data.trfo : "";
     el("in-koli").value  = data && data.koli !== "" ? data.koli : "";
+    saklarDatang.setel(data ? data.datang : false);
     el("in-kat").value   = KATEGORI;
     ["err-brand","err-trfo","err-koli","err-file"].forEach(function(i){ el(i).classList.remove("show"); });
     sembunyiLampiran();
@@ -1118,7 +1202,8 @@
       aksi: sedangEdit ? "ubah" : "tambah",
       brand: brand,
       gr: gr,
-      koli: koli
+      koli: koli,
+      datang: saklarDatang.nilai()
     };
     if(sedangEdit) muatan.id = sedangEdit.id;
     if(berkasDilepas && !berkasBaru) muatan.lepasBerkas = true;
@@ -1178,9 +1263,10 @@
     var data = terlihat();
     if(!data.length){ pesan("Tidak ada baris untuk diunduh"); return; }
     var kutip = function(s){ return '"' + String(s == null ? "" : s).replace(/"/g,'""') + '"'; };
-    var isi = ["Brand,Kategori,GR Number,Total Koli,Surat Jalan,Status,Tanggal Unggah,Link Berkas"].concat(
+    var isi = ["Brand,Kategori,GR Number,Total Koli,Kedatangan,Surat Jalan,Status,Tanggal Unggah,Link Berkas"].concat(
       data.map(function(b){
         return [b.brand, b.kategori, b.trfo, b.koli,
+                b.datang ? "Sudah diterima" : "Belum diterima",
                 b.sj ? b.sj.nama : "",
                 b.sj ? "Lengkap" : "Belum ada berkas",
                 b.sj ? tanggalID(b.sj.tanggal) : "",
@@ -1197,9 +1283,10 @@
   }
 
   /* ---------- kejadian ---------- */
-  ["cari","f-brand","f-status"].forEach(function(id){ el(id).addEventListener("input", gambar); });
+  ["cari","f-brand","f-status","f-datang-saring"].forEach(function(id){ el(id).addEventListener("input", gambar); });
   el("btn-reset").addEventListener("click", function(){
-    el("cari").value = ""; el("f-brand").value = ""; el("f-status").value = ""; gambar();
+    el("cari").value = ""; el("f-brand").value = ""; el("f-status").value = "";
+    el("f-datang-saring").value = ""; gambar();
   });
   el("btn-muat").addEventListener("click", function(){ segarkan(false); });
   el("btn-tambah").addEventListener("click", function(){ bukaForm(null); });
@@ -1269,6 +1356,23 @@
     var b = baris.find(function(x){ return x.id === id; });
     if(!b) return;
     var aksi = btn.dataset.aksi;
+    if(aksi === "datang"){
+      var mau = !b.datang;
+      btn.disabled = true;
+      tandai("sibuk", "Menyimpan kedatangan…");
+      try{
+        await panggil({aksi:"kedatangan", id:id, datang:mau});
+        b.datang = mau;
+        pesan(b.trfo + (mau ? " ditandai sudah diterima" : " dikembalikan ke belum diterima"));
+        tandai("ok", "Tersinkron " + jamSekarang());
+        gambar();
+      }catch(err){
+        btn.disabled = false;
+        tandai("gagal", "Gagal menyimpan");
+        pesan("Gagal menyimpan kedatangan: " + err.message);
+      }
+      return;
+    }
     if(aksi === "lihat") return bukaLihat(b);
     if(aksi === "edit")  return bukaForm(b);
     if(aksi === "hapus"){
