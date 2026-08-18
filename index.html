@@ -21,6 +21,7 @@
     --carbon-pink:#F7DDE1;
     --carbon-pink-edge:#DFA9B2;
     --stamp-red:#B0281E;
+    --stamp-amber:#8A6410;
     --stamp-green:#1C6B4A;
     --locked:#EDEBE4;
     --radius:4px;
@@ -57,7 +58,7 @@
   }
   .kop__org{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-soft);text-align:right;line-height:1.7;}
   .kop__org b{display:block;color:var(--ink);font-weight:600;letter-spacing:.04em;}
-  .kop__fields{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));}
+  .kop__fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));}
   .field{padding:14px 17px 16px;border-right:1px dashed var(--rule-strong);}
   .field:last-child{border-right:none;}
   .field__label{
@@ -67,6 +68,7 @@
   .field__value{font-family:"Archivo",sans-serif;font-weight:600;font-size:23px;line-height:1.1;letter-spacing:-.01em;}
   .field__value small{font-size:13px;font-weight:500;color:var(--ink-soft);margin-left:4px;}
   .field--pink .field__value{color:var(--stamp-red);}
+  .field--kuning .field__value{color:var(--stamp-amber);}
   .field--green .field__value{color:var(--stamp-green);}
   .field--periode .field__value{font-size:15px;font-family:"IBM Plex Mono",monospace;font-weight:500;}
 
@@ -151,10 +153,14 @@
     letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;border:1.5px solid currentColor;
     border-radius:3px;transform:rotate(-1.5deg);white-space:nowrap;
   }
-  .stamp--terbit{color:var(--stamp-green);background:#E6F1EA;}
-  .stamp--belum{color:var(--stamp-red);background:var(--carbon-pink);border-style:dashed;}
-  tr[data-status="belum"] td:first-child{box-shadow:inset 3px 0 0 var(--carbon-pink-edge);}
-  tr[data-status="terbit"] td:first-child{box-shadow:inset 3px 0 0 var(--stamp-green);}
+  .stamp--ready{color:var(--stamp-green);background:#E6F1EA;}
+  .stamp--reject{color:var(--stamp-red);background:var(--carbon-pink);}
+  .stamp--display{color:var(--stamp-amber);background:var(--carbon-yellow);}
+  .stamp--kosong{color:var(--ink-faint);background:transparent;border-style:dashed;}
+  tr[data-status="ready"] td:first-child{box-shadow:inset 3px 0 0 var(--stamp-green);}
+  tr[data-status="reject"] td:first-child{box-shadow:inset 3px 0 0 var(--carbon-pink-edge);}
+  tr[data-status="display"] td:first-child{box-shadow:inset 3px 0 0 #E3CE7A;}
+  tr[data-status="kosong"] td:first-child{box-shadow:inset 3px 0 0 var(--rule-strong);}
 
   td.aksi{text-align:right;white-space:nowrap;}
   .ico{width:30px;height:30px;padding:0;justify-content:center;border-color:transparent;background:transparent;color:var(--ink-soft);}
@@ -225,6 +231,7 @@
     border-radius:2px;padding:2px 5px;margin-left:7px;vertical-align:1px;
   }
   .drop.salah{border-color:var(--stamp-red);background:var(--carbon-pink);}
+  select.salah,input.salah{border-color:var(--stamp-red);background:#FDF4F5;}
   .drop.salah .drop__ikon{color:var(--stamp-red);}
   .err{font-size:12.5px;color:var(--stamp-red);margin:5px 0 0;display:none;}
   .err.show{display:block;}
@@ -280,6 +287,7 @@
     max-width:calc(100vw - 40px);text-align:center;
   }
   .toast.show{opacity:1;transform:translate(-50%,0);}
+  .toast--galat{background:var(--stamp-red);max-width:min(520px,calc(100vw - 40px));line-height:1.5;}
 
   @media (max-width:760px){
     .kop__fields{grid-template-columns:repeat(2,1fr);}
@@ -300,16 +308,14 @@
     }
     td.num{display:none;}
     tr[data-status] td:first-child{box-shadow:none;}
-    tbody tr[data-status="belum"]{border-left:3px solid var(--carbon-pink-edge);}
-    tbody tr[data-status="terbit"]{border-left:3px solid var(--stamp-green);}
+    tbody tr[data-status="ready"]{border-left:3px solid var(--stamp-green);}
+    tbody tr[data-status="reject"]{border-left:3px solid var(--carbon-pink-edge);}
+    tbody tr[data-status="display"]{border-left:3px solid #E3CE7A;}
+    tbody tr[data-status="kosong"]{border-left:3px solid var(--rule-strong);}
     td.tengah{justify-content:space-between;}
     td.aksi{justify-content:flex-end;padding-top:8px;}
     td.aksi::before{margin-right:auto;}
     .lihat iframe{height:52vh;}
-  }
-  @media (max-width:1040px) and (min-width:761px){
-    .kop__fields{grid-template-columns:repeat(3,minmax(0,1fr));}
-    .field:nth-child(3n){border-right:none;}
   }
   @media (prefers-reduced-motion:reduce){
     *{animation:none!important;transition:none!important;}
@@ -381,14 +387,6 @@
         <span class="field__label">Total GR</span>
         <span class="field__value" id="f-total">0</span>
       </div>
-      <div class="field field--green">
-        <span class="field__label">Surat jalan diunggah</span>
-        <span class="field__value" id="f-terbit">0<small id="f-persen">0%</small></span>
-      </div>
-      <div class="field field--pink">
-        <span class="field__label">Belum ada berkas</span>
-        <span class="field__value" id="f-belum">0</span>
-      </div>
       <div class="field">
         <span class="field__label">Total koli</span>
         <span class="field__value" id="f-koli">0</span>
@@ -396,6 +394,18 @@
       <div class="field field--green">
         <span class="field__label">Sudah diterima</span>
         <span class="field__value" id="f-datang">0<small id="f-datang-persen">0%</small></span>
+      </div>
+      <div class="field field--green">
+        <span class="field__label">Ready to sell</span>
+        <span class="field__value" id="f-ready">0</span>
+      </div>
+      <div class="field field--pink">
+        <span class="field__label">Reject</span>
+        <span class="field__value" id="f-reject">0</span>
+      </div>
+      <div class="field field--kuning">
+        <span class="field__label">Ex display</span>
+        <span class="field__value" id="f-display">0</span>
       </div>
     </div>
   </header>
@@ -410,10 +420,12 @@
       <input type="search" id="cari" placeholder="Cari GR number, brand, atau nama berkas" aria-label="Cari data">
     </div>
     <select id="f-brand" aria-label="Saring brand"><option value="">Semua brand</option></select>
-    <select id="f-status" aria-label="Saring status surat jalan">
+    <select id="f-status" aria-label="Saring status barang">
       <option value="">Semua status</option>
-      <option value="terbit">Surat jalan sudah diunggah</option>
-      <option value="belum">Belum ada berkas</option>
+      <option value="Ready To Sell">Ready To Sell</option>
+      <option value="Reject">Reject</option>
+      <option value="Ex Display">Ex Display</option>
+      <option value="-">Belum ditentukan</option>
     </select>
     <select id="f-datang-saring" aria-label="Saring kedatangan">
       <option value="">Semua kedatangan</option>
@@ -521,6 +533,16 @@
         <input type="text" id="in-koli" inputmode="numeric" placeholder="12" autocomplete="off">
         <p class="hint">Jumlah koli yang diterima. Boleh dikosongkan dulu kalau belum dihitung.</p>
         <p class="err" id="err-koli">Total koli harus berupa angka bulat.</p>
+      </div>
+      <div>
+        <label class="lbl" for="in-status">Status barang <span class="wajib">wajib</span></label>
+        <select id="in-status" style="width:100%">
+          <option value="">Pilih status barang…</option>
+          <option value="Ready To Sell">Ready To Sell</option>
+          <option value="Reject">Reject</option>
+          <option value="Ex Display">Ex Display</option>
+        </select>
+        <p class="err" id="err-status">Status barang wajib dipilih.</p>
       </div>
       <div>
         <label class="lbl">Kedatangan</label>
@@ -662,6 +684,7 @@
       trfo: r.gr,
       koli: (r.koli === "" || r.koli === null || r.koli === undefined) ? "" : Number(r.koli),
       datang: r.datang === true || String(r.datang).toLowerCase() === "true",
+      status: STATUS_PILIHAN.indexOf(r.status) > -1 ? r.status : "",
       sj: r.berkasId ? {
         nama: r.berkasNama || "surat-jalan",
         tipe: r.berkasTipe || "application/pdf",
@@ -689,14 +712,20 @@
       pertamaKali = false;
     }catch(e){
       tandai("gagal", "Gagal ambil data");
-      if(!diamDiam || pertamaKali) pesan("Data gagal diambil: " + e.message);
+      if(!diamDiam || pertamaKali) pesan("Data gagal diambil. " + jelaskan(e), true);
     }
     el("memuat").hidden = true;
     gambar();
   }
 
   /* ---------- bantu ---------- */
-  function statusDari(b){ return b.sj ? "terbit" : "belum"; }
+  var STATUS_PILIHAN = ["Ready To Sell", "Reject", "Ex Display"];
+  function kunciStatus(t){
+    if(t === "Ready To Sell") return "ready";
+    if(t === "Reject") return "reject";
+    if(t === "Ex Display") return "display";
+    return "kosong";
+  }
   function lolos(t){ return String(t == null ? "" : t).replace(/[&<>"']/g, function(c){
     return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
   });}
@@ -714,12 +743,28 @@
     return d.getDate() + " " + bln[d.getMonth()] + " " + d.getFullYear() + ", " +
            String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
   }
-  function pesan(teks){
+  function pesan(teks, lama){
     var t = el("toast");
     t.textContent = teks;
+    t.classList.toggle("toast--galat", !!lama);
     t.classList.add("show");
     clearTimeout(pesan._t);
-    pesan._t = setTimeout(function(){ t.classList.remove("show"); }, 3200);
+    pesan._t = setTimeout(function(){ t.classList.remove("show"); }, lama ? 9000 : 3200);
+  }
+
+  // terjemahkan galat yang sering muncul jadi tindakan yang jelas
+  function jelaskan(e){
+    var m = String(e && e.message || e);
+    if(m.indexOf("Aksi tidak dikenal") > -1){
+      return "Apps Script masih versi lama. Buka Apps Script → Deploy → Manage deployments → ikon pensil → Version: New version → Deploy.";
+    }
+    if(m.indexOf("bukan JSON") > -1){
+      return "Web app belum dibuka untuk \"Anyone\" di pengaturan deploy.";
+    }
+    if(m.indexOf("Failed to fetch") > -1 || m.indexOf("NetworkError") > -1){
+      return "Tidak bisa menghubungi Apps Script. Cek koneksi internet, lalu coba Muat ulang.";
+    }
+    return m;
   }
 
   /* ---------- baca & kecilkan berkas ---------- */
@@ -826,10 +871,12 @@
     var fb = el("f-brand").value, fs = el("f-status").value, fd = el("f-datang-saring").value;
     var hasil = baris.filter(function(b){
       if(fb && b.brand !== fb) return false;
-      if(fs && statusDari(b) !== fs) return false;
+      if(fs === "-" && b.status) return false;
+      if(fs && fs !== "-" && b.status !== fs) return false;
       if(fd && (fd === "ya") !== !!b.datang) return false;
       if(!q) return true;
-      return (b.brand + " " + b.kategori + " " + b.trfo + " " + (b.sj ? b.sj.nama : "")).toLowerCase().indexOf(q) > -1;
+      return (b.brand + " " + b.kategori + " " + b.trfo + " " + b.status + " " +
+              (b.sj ? b.sj.nama : "")).toLowerCase().indexOf(q) > -1;
     });
     hasil.sort(function(x,y){
       var a, b;
@@ -838,7 +885,9 @@
         return (ax - ay) * urut.arah;
       }
       if(urut.key === "datang") return ((y.datang?1:0) - (x.datang?1:0)) * urut.arah;
-      if(urut.key === "status"){ a = statusDari(x); b = statusDari(y); }
+      if(urut.key === "status"){
+        a = x.status || "\uffff"; b = y.status || "\uffff";
+      }
       else if(urut.key === "surat"){ a = x.sj ? x.sj.nama : "\uffff"; b = y.sj ? y.sj.nama : "\uffff"; }
       else { a = x[urut.key] || "\uffff"; b = y[urut.key] || "\uffff"; }
       return String(a).localeCompare(String(b), "id", {numeric:true}) * urut.arah;
@@ -850,7 +899,7 @@
     var data = terlihat();
 
     tbody.innerHTML = data.map(function(b, i){
-      var st = statusDari(b);
+      var st = kunciStatus(b.status);
       var sel;
       if(b.sj){
         var pdf = b.sj.tipe === "application/pdf";
@@ -879,7 +928,7 @@
         '</td>' +
         '<td data-label="Surat jalan">' + sel + '</td>' +
         '<td data-label="Status"><span class="stamp stamp--' + st + '">' +
-          (st === "terbit" ? "Lengkap" : "Belum ada berkas") + '</span></td>' +
+          lolos(b.status || "Belum ditentukan") + '</span></td>' +
         '<td class="aksi" data-label="Aksi">' +
           '<button class="ico" data-aksi="edit" aria-label="Ubah ' + lolos(b.trfo) + '">' +
             '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M11.2 2.3l2.5 2.5L5.5 13l-3.2.7.7-3.2 8.2-8.2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>' +
@@ -894,11 +943,11 @@
     el("kosong").hidden = data.length > 0 || !el("memuat").hidden;
     el("kaki-info").textContent = data.length + " baris ditampilkan dari " + baris.length + " total";
 
-    var lengkap = baris.filter(function(b){ return statusDari(b) === "terbit"; }).length;
+    function hitungStatus(t){ return baris.filter(function(b){ return b.status === t; }).length; }
     el("f-total").textContent = baris.length;
-    el("f-terbit").firstChild.nodeValue = lengkap;
-    el("f-persen").textContent = baris.length ? Math.round(lengkap / baris.length * 100) + "%" : "0%";
-    el("f-belum").textContent = baris.length - lengkap;
+    el("f-ready").textContent = hitungStatus("Ready To Sell");
+    el("f-reject").textContent = hitungStatus("Reject");
+    el("f-display").textContent = hitungStatus("Ex Display");
     el("f-koli").textContent = baris.reduce(function(t, b){
       return t + (b.koli === "" ? 0 : Number(b.koli) || 0);
     }, 0).toLocaleString("id-ID");
@@ -1153,8 +1202,10 @@
     el("in-trfo").value  = data ? data.trfo : "";
     el("in-koli").value  = data && data.koli !== "" ? data.koli : "";
     saklarDatang.setel(data ? data.datang : false);
+    el("in-status").value = (data && data.status) ? data.status : "";
+    el("in-status").classList.remove("salah");
     el("in-kat").value   = KATEGORI;
-    ["err-brand","err-trfo","err-koli","err-file"].forEach(function(i){ el(i).classList.remove("show"); });
+    ["err-brand","err-trfo","err-koli","err-status","err-file"].forEach(function(i){ el(i).classList.remove("show"); });
     sembunyiLampiran();
     el("drop").classList.remove("salah");
     el("backdrop").classList.add("open");
@@ -1182,10 +1233,14 @@
     var koli  = el("in-koli").value.trim().replace(/[.\s]/g, "");
     var koliSah = koli === "" || /^\d+$/.test(koli);
     var adaBerkas = !!berkasBaru || !!(sedangEdit && sedangEdit.sj);
+    var status = el("in-status").value;
     var ok = true;
     el("err-brand").classList.toggle("show", !brand); if(!brand) ok = false;
     el("err-trfo").classList.toggle("show", !gr);     if(!gr)    ok = false;
     el("err-koli").classList.toggle("show", !koliSah); if(!koliSah) ok = false;
+    el("err-status").classList.toggle("show", !status);
+    el("in-status").classList.toggle("salah", !status);
+    if(!status) ok = false;
 
     el("drop").classList.toggle("salah", !adaBerkas);
     el("err-file").classList.toggle("show", !adaBerkas);
@@ -1203,7 +1258,8 @@
       brand: brand,
       gr: gr,
       koli: koli,
-      datang: saklarDatang.nilai()
+      datang: saklarDatang.nilai(),
+      status: status
     };
     if(sedangEdit) muatan.id = sedangEdit.id;
     if(berkasDilepas && !berkasBaru) muatan.lepasBerkas = true;
@@ -1228,9 +1284,9 @@
     }catch(e){
       kunciForm(false);
       tandai("gagal", "Gagal menyimpan");
-      el("err-file").textContent = e.message;
+      el("err-file").textContent = jelaskan(e);
       el("err-file").classList.add("show");
-      pesan("Gagal menyimpan: " + e.message);
+      pesan("Gagal menyimpan. " + jelaskan(e), true);
     }
   }
 
@@ -1263,12 +1319,12 @@
     var data = terlihat();
     if(!data.length){ pesan("Tidak ada baris untuk diunduh"); return; }
     var kutip = function(s){ return '"' + String(s == null ? "" : s).replace(/"/g,'""') + '"'; };
-    var isi = ["Brand,Kategori,GR Number,Total Koli,Kedatangan,Surat Jalan,Status,Tanggal Unggah,Link Berkas"].concat(
+    var isi = ["Brand,Kategori,GR Number,Total Koli,Kedatangan,Status,Surat Jalan,Tanggal Unggah,Link Berkas"].concat(
       data.map(function(b){
         return [b.brand, b.kategori, b.trfo, b.koli,
                 b.datang ? "Sudah diterima" : "Belum diterima",
+                b.status || "Belum ditentukan",
                 b.sj ? b.sj.nama : "",
-                b.sj ? "Lengkap" : "Belum ada berkas",
                 b.sj ? tanggalID(b.sj.tanggal) : "",
                 b.sj ? b.sj.link : ""].map(kutip).join(",");
       })
@@ -1369,7 +1425,7 @@
       }catch(err){
         btn.disabled = false;
         tandai("gagal", "Gagal menyimpan");
-        pesan("Gagal menyimpan kedatangan: " + err.message);
+        pesan("Kedatangan gagal disimpan. " + jelaskan(err), true);
       }
       return;
     }
@@ -1384,7 +1440,7 @@
         await segarkan(true);
       }catch(err){
         tandai("gagal", "Gagal menghapus");
-        pesan("Gagal menghapus: " + err.message);
+        pesan("Gagal menghapus. " + jelaskan(err), true);
       }
     }
   });
